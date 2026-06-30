@@ -31,6 +31,7 @@ dependencies = [
     "socksio==1.0.0",
     "pydub==0.25.1",
     "litellm==1.86.2",
+    "truststore>=0.10.0",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +43,14 @@ g4f = [
 # with `uv sync --extra twelvelabs`.
 twelvelabs = [
     "twelvelabs>=1.2.8",
+]
+# Optional Metricool scheduling. Installs the MCP client + the official
+# `mcp-metricool` server + the Dropbox SDK used to host videos publicly so
+# Metricool can fetch them. Install with `uv sync --extra metricool`.
+metricool = [
+    "mcp>=1.0.0",
+    "mcp-metricool>=1.1.9",
+    "dropbox>=12.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]

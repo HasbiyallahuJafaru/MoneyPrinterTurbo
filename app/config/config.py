@@ -154,6 +154,8 @@ def save_config():
         _cfg["siliconflow"] = siliconflow
         _cfg["elevenlabs"] = elevenlabs
         _cfg["chatterbox"] = chatterbox
+        _cfg["metricool"] = metricool
+        _cfg["dropbox"] = dropbox
         _cfg["ui"] = ui
         f.write(toml.dumps(_cfg))
 
@@ -166,6 +168,8 @@ azure = _cfg.get("azure", {})
 siliconflow = _cfg.get("siliconflow", {})
 elevenlabs = _cfg.get("elevenlabs", {})
 chatterbox = _cfg.get("chatterbox", {})
+metricool = _cfg.get("metricool", {})
+dropbox = _cfg.get("dropbox", {})
 ui = _cfg.get(
     "ui",
     {

@@ -1,3 +1,14 @@
+# Make Python's TLS use the OS trust store (Windows/macOS), so HTTPS to LLM /
+# stock-footage APIs works behind TLS-intercepting AV/proxies (e.g. Avast),
+# whose root CA lives in the OS store but not in certifi.
+# ponytail: try/except so machines without truststore still run.
+try:
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 import uvicorn
 from loguru import logger
 

@@ -432,6 +432,55 @@ upload_post_auto_upload = false
 # YouTube Shorts privacy status (options: "public", "unlisted", "private")
 upload_post_youtube_privacy_status = "public"
 
+########## Metricool (schedule generated videos to social networks)
+# Schedule generated videos to TikTok / Instagram / YouTube / Facebook etc. via
+# Metricool, picking any future date/time + timezone. Uses the official
+# `mcp-metricool` MCP server, which works on ANY Metricool plan (the free plan
+# allows up to 20 scheduled posts). Install with `uv sync --extra metricool`.
+#
+# Get METRICOOL_USER_TOKEN and METRICOOL_USER_ID from your Metricool account
+# settings (the same credentials used to configure the Metricool MCP).
+[metricool]
+enabled = false
+# Connection mode:
+#   "oauth" -> hosted MCP at mcp_url, authorized by logging in to Metricool in
+#              the desktop app (most user-friendly; no token copying). The app
+#              stores the OAuth bearer in access_token below.
+#   "token" -> local mcp-metricool server using user_token + user_id (power users).
+mode = "token"
+mcp_url = "https://ai.metricool.com/mcp"
+# Set automatically by the desktop app after you click "Connect Metricool".
+access_token = ""
+# Only used when mode = "token":
+user_token = ""
+user_id = ""
+# Default brand to post to (blogId). Discover yours via GET /api/v1/metricool/brands.
+blog_id = 0
+# Networks to schedule to by default (e.g. "tiktok", "instagram", "youtube",
+# "facebook", "twitter", "linkedin", "pinterest", "bluesky", "threads").
+networks = ["tiktok", "instagram"]
+# IANA timezone used to interpret the scheduled time, e.g. "Asia/Jakarta".
+# Leave empty to use the brand's timezone from Metricool.
+timezone = ""
+# Auto-schedule after each generation (currently driven from the UI/API instead).
+auto_schedule = false
+# Optional: override how the MCP server is launched. Empty = auto-detect
+# (mcp-metricool console script, then uvx, then `python -m mcp_metricool`).
+server_command = ""
+
+########## Dropbox (public hosting for videos so Metricool can fetch them)
+# Metricool downloads media from a public URL; it cannot read localhost. The app
+# uploads each final video to Dropbox and passes Metricool a direct-download URL.
+# Prefer a long-lived refresh token (app_key + app_secret + refresh_token).
+[dropbox]
+enabled = false
+app_key = ""
+app_secret = ""
+refresh_token = ""
+# A short-lived access_token also works for quick testing (expires in ~4h).
+access_token = ""
+dest_folder = "/MoneyPrinterTurbo"
+
 # Chatterbox TTS (self-hosted, OpenAI-compatible) ##########################
 # Chatterbox (https://github.com/resemble-ai/chatterbox, MIT) is an open-source,
 # locally hosted TTS model with zero-shot voice cloning — a self-hostable

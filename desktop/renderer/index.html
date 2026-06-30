@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: https: http://127.0.0.1:8080 http://localhost:8080; media-src http://127.0.0.1:8080 http://localhost:8080;"
+    />
+    <title>MoneyPrinterTurbo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- SIDEBAR -->
+      <nav id="sidebar">
+        <div class="brand">MoneyPrinterTurbo</div>
+
+        <button class="nav-item active" data-view="generate">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 5v14"/></svg>
+          <span>Generate</span>
+        </button>
+        <button class="nav-item" data-view="schedule">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+          <span>Schedule</span>
+        </button>
+        <button class="nav-item" data-view="keys">
+          <svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M16 7l3 3M15 9l2 2"/></svg>
+          <span>API Keys</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <svg viewBox="0 0 24 24"><path d="M4 7h11M19 7h1M4 17h6M14 17h6"/><circle cx="17" cy="7" r="2.4"/><circle cx="12" cy="17" r="2.4"/></svg>
+          <span>Settings</span>
+        </button>
+
+        <div class="nav-spacer"></div>
+        <div id="backend-pill" class="status-line">
+          <span class="dot dot-wait"></span><span id="backend-text">Backend starting…</span>
+        </div>
+      </nav>
+
+      <!-- CONTENT -->
+      <main>
+        <!-- GENERATE -->
+        <section id="view-generate" class="view active">
+          <header class="page-head">
+            <h1>Generate a video</h1>
+            <p class="sub">Describe the video. We write the script, fetch footage, narrate, subtitle, and render — then you can post or schedule it.</p>
+          </header>
+
+          <div id="gen-offline" class="notice hidden">Backend offline — start it to generate videos.</div>
+
+          <div class="card">
+            <div class="field">
+              <label for="g-subject">Subject</label>
+              <input id="g-subject" type="text" placeholder="e.g. 3 habits that quietly build wealth" />
+            </div>
+            <div class="field">
+              <label for="g-script">Script <span class="help-inline">(optional — leave blank to auto-write)</span></label>
+              <textarea id="g-script" rows="3" placeholder="Leave empty to generate from the subject."></textarea>
+            </div>
+
+            <div class="grid-3">
+              <div class="field">
+                <label for="g-language">Language</label>
+                <select id="g-language">
+                  <option value="">Auto</option>
+                  <option value="en">English</option>
+                  <option value="zh">中文</option>
+                  <option value="es">Español</option>
+                  <option value="ar">العربية</option>
+                  <option value="pt">Português</option>
+                  <option value="fr">Français</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="g-aspect">Aspect</label>
+                <select id="g-aspect">
+                  <option value="9:16">9:16 vertical</option>
+                  <option value="16:9">16:9 landscape</option>
+                  <option value="1:1">1:1 square</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="g-source">Footage source</label>
+                <select id="g-source">
+                  <option value="pexels">Pexels</option>
+                  <option value="pixabay">Pixabay</option>
+                  <option value="local">Local</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="field">
+                <label for="g-voice">Voice</label>
+                <select id="g-voice">
+                  <option value="en-US-JennyNeural-Female">EN · Jenny (F)</option>
+                  <option value="en-US-GuyNeural-Male">EN · Guy (M)</option>
+                  <option value="en-US-AriaNeural-Female">EN · Aria (F)</option>
+                  <option value="en-GB-SoniaNeural-Female">EN-GB · Sonia (F)</option>
+                  <option value="zh-CN-XiaoxiaoNeural-Female">ZH · Xiaoxiao (F)</option>
+                  <option value="es-ES-ElviraNeural-Female">ES · Elvira (F)</option>
+                  <option value="ar-EG-SalmaNeural-Female">AR · Salma (F)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="g-clip">Clip seconds</label>
+                <input id="g-clip" type="number" min="2" max="15" value="5" />
+              </div>
+              <div class="field">
+                <label for="g-count">How many</label>
+                <input id="g-count" type="number" min="1" max="5" value="1" />
+              </div>
+            </div>
+
+            <details class="advanced">
+              <summary>Advanced</summary>
+              <div class="grid-3">
+                <div class="field">
+                  <label for="g-paragraphs">Script paragraphs</label>
+                  <input id="g-paragraphs" type="number" min="1" max="10" value="1" />
+                </div>
+                <div class="field">
+                  <label for="g-rate">Voice rate</label>
+                  <input id="g-rate" type="number" step="0.1" min="0.5" max="2" value="1.0" />
+                </div>
+                <div class="field">
+                  <label for="g-bgm">Background music</label>
+                  <select id="g-bgm">
+                    <option value="random">Random</option>
+                    <option value="">None</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid-3">
+                <div class="field check-field">
+                  <label class="check"><input id="g-subs" type="checkbox" checked /><span>Subtitles</span></label>
+                </div>
+                <div class="field">
+                  <label for="g-fontsize">Subtitle size</label>
+                  <input id="g-fontsize" type="number" min="20" max="120" value="60" />
+                </div>
+                <div class="field">
+                  <label for="g-position">Subtitle position</label>
+                  <select id="g-position">
+                    <option value="bottom">Bottom</option>
+                    <option value="center">Center</option>
+                    <option value="top">Top</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+
+            <div class="actions">
+              <button id="g-generate" class="btn btn-primary">Generate</button>
+              <span id="g-status" class="gen-status"></span>
+            </div>
+
+            <div id="g-progress" class="progress hidden"><div id="g-progress-bar" class="progress-bar"></div></div>
+            <div id="g-error" class="result"></div>
+          </div>
+
+          <div id="g-results" class="results"></div>
+        </section>
+
+        <!-- SCHEDULE -->
+        <section id="view-schedule" class="view">
+          <header class="page-head">
+            <h1>Schedule a post</h1>
+            <p class="sub">Upload a generated video to Dropbox and schedule it through Metricool.</p>
+          </header>
+
+          <div class="card">
+            <div class="field">
+              <label for="s-video">Video path</label>
+              <input id="s-video" type="text" placeholder="task-id/final-1.mp4" />
+              <p class="help">Task-relative path of a generated video.</p>
+            </div>
+
+            <div class="field">
+              <label for="s-text">Caption</label>
+              <textarea id="s-text" rows="3" placeholder="Write your caption…"></textarea>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="s-brand">Brand</label>
+                <select id="s-brand"><option value="">Load brands…</option></select>
+              </div>
+              <div class="field">
+                <label for="s-tz">Timezone</label>
+                <input id="s-tz" type="text" placeholder="Africa/Lagos" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Networks</label>
+              <div id="s-networks" class="chips">
+                <label><input type="checkbox" value="tiktok" /><span>TikTok</span></label>
+                <label><input type="checkbox" value="instagram" /><span>Instagram</span></label>
+                <label><input type="checkbox" value="youtube" /><span>YouTube</span></label>
+                <label><input type="checkbox" value="facebook" /><span>Facebook</span></label>
+                <label><input type="checkbox" value="linkedin" /><span>LinkedIn</span></label>
+                <label><input type="checkbox" value="twitter" /><span>X</span></label>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="s-when">Publish at</label>
+                <input id="s-when" type="datetime-local" />
+              </div>
+              <div class="field check-field">
+                <label class="check"><input id="s-draft" type="checkbox" checked /><span>Save as draft</span></label>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="s-submit" class="btn btn-primary">Schedule post</button>
+            </div>
+            <div id="s-result" class="result"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>Upcoming posts</h3>
+              <button id="s-refresh" class="btn btn-ghost btn-sm">Refresh</button>
+            </div>
+            <pre id="s-list" class="code">—</pre>
+          </div>
+        </section>
+
+        <!-- API KEYS -->
+        <section id="view-keys" class="view">
+          <header class="page-head">
+            <h1>API Keys</h1>
+            <p class="sub">Provider keys used to generate videos. Saved to your local config.</p>
+          </header>
+
+          <div id="keys-offline" class="notice hidden">Backend offline — start it to load and save keys.</div>
+
+          <div class="card">
+            <h3>Video sources</h3>
+            <div class="field">
+              <label for="k-pexels">Pexels API keys</label>
+              <input id="k-pexels" type="text" placeholder="key1, key2" />
+              <p class="help">Comma-separate multiple keys to spread rate limits.</p>
+            </div>
+            <div class="field">
+              <label for="k-pixabay">Pixabay API keys</label>
+              <input id="k-pixabay" type="text" placeholder="key1, key2" />
+            </div>
+            <div class="field">
+              <label for="k-coverr">Coverr API keys</label>
+              <input id="k-coverr" type="text" placeholder="key1, key2" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Language model</h3>
+            <div class="field">
+              <label for="k-provider">Provider</label>
+              <select id="k-provider">
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="moonshot">Moonshot</option>
+                <option value="qwen">Qwen</option>
+                <option value="aihubmix">AIHubMix</option>
+                <option value="volcengine">VolcEngine</option>
+                <option value="ollama">Ollama (local)</option>
+              </select>
+            </div>
+            <div id="provider-fields"></div>
+          </div>
+
+          <div class="card">
+            <h3>Subtitles</h3>
+            <div class="field">
+              <label for="k-subtitle">Subtitle provider</label>
+              <select id="k-subtitle">
+                <option value="edge">Edge (fast, no GPU)</option>
+                <option value="whisper">Whisper (local, accurate)</option>
+                <option value="">None</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="actions sticky-actions">
+            <button id="k-save" class="btn btn-primary">Save keys</button>
+            <span id="k-saved" class="saved hidden">Saved</span>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section id="view-settings" class="view">
+          <header class="page-head">
+            <h1>Settings</h1>
+            <p class="sub">Connect the accounts used for scheduling and hosting.</p>
+          </header>
+
+          <div class="card">
+            <div class="conn">
+              <div class="conn-info">
+                <h3>Metricool</h3>
+                <p class="sub">Schedule posts to your connected social accounts.</p>
+              </div>
+              <div class="conn-action">
+                <span id="m-status" class="badge badge-off">Not connected</span>
+                <button id="m-connect" class="btn btn-primary btn-sm">Connect</button>
+                <button id="m-disconnect" class="btn btn-ghost btn-sm hidden">Disconnect</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="conn">
+              <div class="conn-info">
+                <h3>Dropbox</h3>
+                <p class="sub">Hosts your videos so Metricool can fetch them.</p>
+              </div>
+              <div class="conn-action">
+                <span id="d-status" class="badge badge-off">Not connected</span>
+                <button id="d-connect" class="btn btn-primary btn-sm">Connect</button>
+                <button id="d-disconnect" class="btn btn-ghost btn-sm hidden">Disconnect</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="d-appkey">Dropbox app key</label>
+              <input id="d-appkey" type="text" placeholder="public app key (not a secret)" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Defaults</h3>
+            <div class="grid-2">
+              <div class="field">
+                <label for="set-blog">Default brand (blogId)</label>
+                <input id="set-blog" type="text" placeholder="6469712" />
+              </div>
+              <div class="field">
+                <label for="set-tz">Default timezone</label>
+                <input id="set-tz" type="text" placeholder="Africa/Lagos" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="set-folder">Dropbox folder</label>
+              <input id="set-folder" type="text" placeholder="/MoneyPrinterTurbo" />
+            </div>
+            <div class="actions">
+              <button id="set-save" class="btn btn-primary">Save settings</button>
+              <span id="set-saved" class="saved hidden">Saved</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- LOG DRAWER -->
+        <div id="logbar">
+          <button id="log-toggle" class="btn btn-ghost btn-sm">Logs</button>
+          <pre id="logs" class="code hidden"></pre>
+        </div>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
