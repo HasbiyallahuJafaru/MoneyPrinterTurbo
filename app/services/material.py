@@ -9,8 +9,34 @@ from loguru import logger
 from moviepy.video.io.VideoFileClip import VideoFileClip
 
 from app.config import config
+from app.models import const
 from app.models.schema import MaterialInfo, VideoAspect, VideoConcatMode
+from app.services import state as sm
 from app.utils import utils
+
+# Download progress maps onto the 40-50 band of overall task progress
+# (step 5 "Get video materials" in the pipeline).
+_DL_PROGRESS_START = 40
+_DL_PROGRESS_END = 50
+
+
+def _publish_materials(task_id: str, materials: list, audio_duration: float, done_seconds: float):
+    """Write the live per-clip download list + banded progress to task state.
+
+    Safe to overwrite the whole task dict here: during step 5 the task only
+    holds state/progress, so nothing else needs preserving.
+    """
+    if not task_id:
+        return
+    span = _DL_PROGRESS_END - _DL_PROGRESS_START
+    frac = min(1.0, done_seconds / audio_duration) if audio_duration else 0.0
+    progress = _DL_PROGRESS_START + int(span * frac)
+    sm.state.update_task(
+        task_id,
+        state=const.TASK_STATE_PROCESSING,
+        progress=progress,
+        materials=materials,
+    )
 
 # Thread-safe counter for API key rotation
 _api_key_counter = 0
@@ -241,7 +267,7 @@ def search_videos_coverr(
     return []
 
 
-def save_video(video_url: str, save_dir: str = "") -> str:
+def save_video(video_url: str, save_dir: str = "", progress_cb=None) -> str:
     if not save_dir:
         save_dir = utils.storage_dir("cache_videos")
 
@@ -262,17 +288,29 @@ def save_video(video_url: str, save_dir: str = "") -> str:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     }
 
-    # if video does not exist, download it
-    with open(video_path, "wb") as f:
-        f.write(
-            requests.get(
-                video_url,
-                headers=headers,
-                proxies=config.proxy,
-                verify=_get_tls_verify(),
-                timeout=(60, 240),
-            ).content
-        )
+    # if video does not exist, download it (streamed so callers can report the
+    # download level of each clip)
+    with requests.get(
+        video_url,
+        headers=headers,
+        proxies=config.proxy,
+        verify=_get_tls_verify(),
+        timeout=(60, 240),
+        stream=True,
+    ) as r:
+        r.raise_for_status()
+        total = int(r.headers.get("Content-Length") or 0)
+        downloaded = 0
+        if progress_cb:
+            progress_cb(0, total)
+        with open(video_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=262144):
+                if not chunk:
+                    continue
+                f.write(chunk)
+                downloaded += len(chunk)
+                if progress_cb:
+                    progress_cb(downloaded, total)
 
     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
         clip = None
@@ -361,23 +399,50 @@ def download_videos(
         random.shuffle(valid_video_items)
 
     total_duration = 0.0
+    materials = []
     for item in valid_video_items:
+        entry = {
+            "name": f"vid-{utils.md5(item.url.split('?')[0])[:8]}",
+            "source": source,
+            "clip_seconds": round(min(max_clip_duration, item.duration), 1),
+            "downloaded": 0,
+            "total": 0,
+            "percent": 0,
+            "status": "downloading",
+        }
+        materials.append(entry)
+        _publish_materials(task_id, materials, audio_duration, total_duration)
+
+        def _cb(downloaded, total, _e=entry):
+            _e["downloaded"] = downloaded
+            _e["total"] = total
+            _e["percent"] = int(downloaded * 100 / total) if total else 0
+            _publish_materials(task_id, materials, audio_duration, total_duration)
+
         try:
             logger.info(f"downloading video: {item.url}")
             saved_video_path = save_video(
-                video_url=item.url, save_dir=material_directory
+                video_url=item.url, save_dir=material_directory, progress_cb=_cb
             )
             if saved_video_path:
                 logger.info(f"video saved: {saved_video_path}")
                 video_paths.append(saved_video_path)
                 seconds = min(max_clip_duration, item.duration)
                 total_duration += seconds
+                entry["percent"] = 100
+                entry["status"] = "done"
+                _publish_materials(task_id, materials, audio_duration, total_duration)
                 if total_duration > audio_duration:
                     logger.info(
                         f"total duration of downloaded videos: {total_duration} seconds, skip downloading more"
                     )
                     break
+            else:
+                entry["status"] = "failed"
+                _publish_materials(task_id, materials, audio_duration, total_duration)
         except Exception as e:
+            entry["status"] = "failed"
+            _publish_materials(task_id, materials, audio_duration, total_duration)
             logger.error(f"failed to download video: {utils.to_json(item)} => {str(e)}")
     logger.success(f"downloaded {len(video_paths)} videos")
     return video_paths

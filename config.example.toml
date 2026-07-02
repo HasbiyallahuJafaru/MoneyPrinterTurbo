@@ -264,6 +264,24 @@ modelscope_model_name = "Qwen/Qwen3-32B"
 #           "gemini/gemini-2.5-flash", "ollama/llama3"
 litellm_model_name = "openai/gpt-4o-mini"
 
+########## Lemonfox TTS (human-sounding, low-cost, OpenAI-compatible)
+# Lemonfox (https://lemonfox.ai) provides a natural, human-sounding TTS via an
+# OpenAI-compatible /audio/speech endpoint. Get an API key from your Lemonfox
+# dashboard, then in the WebUI/desktop app pick a voice like "lemonfox:sarah".
+# 50+ voices across 8 languages (e.g. sarah, michael, jessica, nicole, river).
+lemonfox_api_key = ""
+# Leave empty to use the default endpoint. Use https://eu-api.lemonfox.ai/v1 for EU processing.
+lemonfox_base_url = "https://api.lemonfox.ai/v1"
+
+########## fal.ai KlingAI (AI-generated footage that matches the topic)
+# Stock footage often doesn't match niche topics. Set a fal.ai key and select
+# "KlingAI" as the footage source to generate topic-relevant clips with Kling.
+# Get a key at https://fal.ai/dashboard/keys.
+# NOTE: this costs money per second of video and is slow (~1-4 min per clip).
+fal_api_key = ""
+# Optional model override; default is fal-ai/kling-video/v1.6/standard/text-to-video.
+fal_kling_model = ""
+
 # Subtitle Provider, "edge" or "whisper"
 # If empty, the subtitle will not be generated
 subtitle_provider = "edge"

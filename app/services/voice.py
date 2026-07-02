@@ -256,6 +256,10 @@ def is_chatterbox_voice(voice_name: str) -> bool:
     return (voice_name or "").startswith("chatterbox:")
 
 
+def is_lemonfox_voice(voice_name: str) -> bool:
+    return (voice_name or "").startswith("lemonfox:")
+
+
 def is_no_voice(voice_name: str | None) -> bool:
     """
     判断用户是否明确选择了“无配音”模式。
@@ -438,6 +442,15 @@ def tts(
         else:
             logger.error(f"Invalid chatterbox voice name format: {voice_name}")
             return None
+    elif is_lemonfox_voice(voice_name):
+        # format: lemonfox:<voice>
+        parts = voice_name.split(":", 1)
+        if len(parts) >= 2 and parts[1].strip():
+            return lemonfox_tts(
+                text, parts[1].strip(), voice_file, voice_rate, voice_volume
+            )
+        logger.error(f"Invalid lemonfox voice name format: {voice_name}")
+        return None
     return azure_tts_v1(text, voice_name, voice_rate, voice_file)
 
 
@@ -1401,6 +1414,79 @@ def chatterbox_tts(
             )
         except Exception as e:
             logger.error(f"chatterbox tts failed: {str(e)}")
+
+    return None
+
+
+def lemonfox_tts(
+    text: str,
+    voice: str,
+    voice_file: str,
+    voice_rate: float = 1.0,
+    voice_volume: float = 1.0,
+) -> Union[SubMaker, None]:
+    """Generate speech with Lemonfox (https://lemonfox.ai), a low-cost,
+    human-sounding TTS with an OpenAI-compatible ``/audio/speech`` endpoint.
+
+    Configure ``lemonfox_api_key`` in config (and optionally ``lemonfox_base_url``).
+    Use a voice like ``lemonfox:sarah``. Like ElevenLabs/Chatterbox it returns no
+    word-level timestamps, so subtitles use the full-text SubMaker; set
+    ``subtitle_provider = "whisper"`` for tighter sync.
+    """
+    text = (text or "").strip()
+    if not text:
+        logger.error("Lemonfox TTS text is empty")
+        return None
+
+    api_key = config.app.get("lemonfox_api_key", "")
+    if not api_key:
+        logger.error("Lemonfox API key is not set (lemonfox_api_key)")
+        return None
+
+    base_url = (
+        config.app.get("lemonfox_base_url", "") or "https://api.lemonfox.ai/v1"
+    ).strip().rstrip("/")
+    url = f"{base_url}/audio/speech"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "input": text,
+        "voice": voice,
+        "response_format": "mp3",
+        # Lemonfox accepts speed 0.5-4.0; map MoneyPrinterTurbo's 1.0-centred rate.
+        "speed": max(0.5, min(4.0, float(voice_rate or 1.0))),
+    }
+
+    for i in range(3):
+        try:
+            logger.info(f"start lemonfox tts, voice: {voice}, try: {i + 1}")
+            ensure_file_path_exists(voice_file)
+
+            response = requests.post(url, json=payload, headers=headers, timeout=120)
+            if response.status_code != 200:
+                logger.error(
+                    f"lemonfox tts failed with status {response.status_code}: {response.text[:200]}"
+                )
+                continue
+
+            with open(voice_file, "wb") as f:
+                f.write(response.content)
+
+            audio_clip = AudioFileClip(voice_file)
+            audio_duration = audio_clip.duration
+            audio_clip.close()
+
+            sub_maker = ensure_legacy_submaker_fields(SubMaker())
+            logger.success(f"lemonfox tts succeeded: {voice_file}")
+            return populate_legacy_submaker_with_full_text(
+                sub_maker=sub_maker,
+                text=text,
+                audio_duration_seconds=audio_duration,
+            )
+        except Exception as e:
+            logger.error(f"lemonfox tts failed: {str(e)}")
 
     return None
 

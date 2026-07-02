@@ -101,6 +101,16 @@ h3 { margin: 0 0 14px; font-size: 15px; font-weight: 650; letter-spacing: -0.01e
 .progress { margin-top: 16px; height: 6px; background: var(--hover); border-radius: 999px; overflow: hidden; }
 .progress-bar { height: 100%; width: 0%; background: var(--black); transition: width 0.3s ease; }
 
+/* Download progress list */
+.downloads { margin-top: 14px; }
+.downloads:empty { margin: 0; }
+.dl-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.dl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.dl-name { flex: 0 0 44%; font-size: 12px; color: var(--ink); font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl-bar { flex: 1; height: 6px; background: var(--hover); border-radius: 999px; overflow: hidden; }
+.dl-fill { height: 100%; width: 0%; background: var(--black); transition: width 0.2s linear; }
+.dl-pct { flex: 0 0 40px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .results { display: flex; flex-direction: column; gap: 16px; }
 .video-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .video-card video { width: 100%; max-height: 460px; background: #000; display: block; }
@@ -108,6 +118,7 @@ h3 { margin: 0 0 14px; font-size: 15px; font-weight: 650; letter-spacing: -0.01e
 .video-card .vc-name { font-size: 13px; font-family: ui-monospace, monospace; color: var(--muted); word-break: break-all; }
 .vc-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .script-block { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; line-height: 1.55; color: var(--ink); }
+.saved-note { padding: 8px 16px 14px; font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; word-break: break-all; }
 
 /* ---- Cards ---- */
 .card {
@@ -157,6 +168,8 @@ select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg x
 }
 .chips input { width: auto; margin: 0; }
 .chips label:has(input:checked) { background: var(--black); color: var(--white); border-color: var(--black); }
+.netbox { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; }
+.netbox > label:first-child { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 
 /* ---- Buttons ---- */
 .actions { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
@@ -205,4 +218,5 @@ select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg x
 
 /* ---- Logs ---- */
 #logbar { position: sticky; bottom: 0; padding: 0 40px 16px; max-width: 860px; }
+.log-head { display: flex; gap: 8px; }
 #logs { margin-top: 8px; max-height: 180px; }

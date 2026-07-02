@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const { app, BrowserWindow, ipcMain } = require("electron");
 const C = require("./config");
 const store = require("./store");
@@ -156,27 +157,73 @@ function registerIpc() {
     backendFetch("POST", "/api/v1/config", { keys })
   );
 
+  ipcMain.handle("script:generate", (_e, body) =>
+    backendFetch("POST", "/api/v1/scripts", body)
+  );
   ipcMain.handle("video:generate", (_e, params) =>
     backendFetch("POST", "/api/v1/videos", params)
   );
   ipcMain.handle("video:status", (_e, taskId) =>
     backendFetch("GET", `/api/v1/tasks/${taskId}`)
   );
+
+  // Copy a finished video into the user's Videos folder.
+  ipcMain.handle("video:export", (_e, rel, name) => {
+    try {
+      const tasksDir = path.join(C.REPO_ROOT, "storage", "tasks");
+      const src = path.resolve(tasksDir, rel);
+      if (!src.startsWith(tasksDir) || !fs.existsSync(src)) {
+        return { ok: false, error: "video not found" };
+      }
+      const dir = path.join(app.getPath("videos"), "MoneyPrinterTurbo");
+      fs.mkdirSync(dir, { recursive: true });
+      const slug = (name || "video")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "video";
+      const dest = path.join(dir, `${slug}-${path.basename(src)}`);
+      fs.copyFileSync(src, dest);
+      return { ok: true, dest };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+}
+
+// Continuously reflect backend health in the UI. A one-shot check races with a
+// slow first import (moviepy/whisper) and can miss the window; polling recovers
+// and also re-pushes credentials the moment the backend becomes reachable.
+function startHealthMonitor() {
+  let last = null;
+  const check = async () => {
+    let ok = false;
+    try {
+      const r = await fetch(C.BACKEND_PING);
+      ok = r.ok;
+    } catch {
+      ok = false;
+    }
+    // Emit every tick so the renderer syncs even if it wasn't listening yet.
+    setBackendState(ok);
+    if (ok !== last) {
+      last = ok;
+      if (ok) {
+        log("[backend] healthy");
+        await pushCredentials();
+      } else {
+        log("[backend] not reachable — starting up…");
+      }
+    }
+  };
+  check();
+  setInterval(check, 3000);
 }
 
 app.whenReady().then(async () => {
   registerIpc();
   createWindow();
-
   backend.launch(log);
-  const healthy = await backend.waitForHealthy();
-  setBackendState(healthy);
-  if (healthy) {
-    log("[backend] healthy");
-    await pushCredentials();
-  } else {
-    log("[backend] not reachable — generation/scheduling will be unavailable until it starts");
-  }
+  startHealthMonitor();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -601,7 +601,24 @@ def combine_videos(
         subclipped_items=subclipped_items,
         concat_mode=video_concat_mode,
     )
-        
+
+    # Verify clip-seconds enforcement: no subclip may exceed max_clip_duration.
+    # (Construction already caps via min(), so this is a guard + visible check.)
+    violations = [
+        it for it in subclipped_items
+        if (it.end_time - it.start_time) > max_clip_duration + 0.05
+    ]
+    if violations:
+        logger.warning(
+            f"clip-seconds NOT enforced: {len(violations)} subclip(s) exceed "
+            f"{max_clip_duration}s — clamping"
+        )
+        for it in violations:
+            it.end_time = it.start_time + max_clip_duration
+    logger.info(
+        f"clip-seconds enforced: {len(subclipped_items)} subclips, each ≤ {max_clip_duration}s"
+    )
+
     logger.debug(f"total subclipped items: {len(subclipped_items)}")
     
     # Add downloaded clips over and over until the duration of the audio (max_duration) has been reached

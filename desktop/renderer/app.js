@@ -13,6 +13,7 @@ const PROVIDERS = {
 let backendHealthy = false;
 let configCache = {};
 let cfg = { streamlitUrl: "http://localhost:8501" };
+let lastSubject = "";
 
 // ---- navigation -----------------------------------------------------------
 const views = document.querySelectorAll(".view");
@@ -41,13 +42,29 @@ window.api.onBackendState((healthy) => {
   document.getElementById("gen-offline").classList.toggle("hidden", healthy);
 });
 
-// ---- logs -----------------------------------------------------------------
+// ---- activity log (plain-English, per session) ----------------------------
 const logs = document.getElementById("logs");
 document.getElementById("log-toggle").addEventListener("click", () => logs.classList.toggle("hidden"));
-window.api.onBackendLog((line) => {
-  logs.textContent += line + "\n";
+document.getElementById("log-clear").addEventListener("click", () => (logs.textContent = ""));
+
+function addActivity(msg) {
+  const t = new Date().toTimeString().slice(0, 8);
+  logs.textContent += `[${t}] ${msg}\n`;
   logs.scrollTop = logs.scrollHeight;
-});
+}
+
+// Map overall progress to a human-readable step.
+function stageFor(progress) {
+  if (progress < 10) return "Writing the script";
+  if (progress < 20) return "Finding keywords";
+  if (progress < 30) return "Generating voiceover";
+  if (progress < 40) return "Creating subtitles";
+  if (progress < 50) return "Sourcing footage";
+  if (progress < 75) return "Combining clips";
+  if (progress < 100) return "Rendering final video";
+  return "Done";
+}
+let lastStage = "";
 
 // ---- settings / connections ----------------------------------------------
 function renderStatus(s) {
@@ -111,6 +128,8 @@ async function loadKeys() {
   setVal("k-pexels", (c.pexels_api_keys || []).join(", "));
   setVal("k-pixabay", (c.pixabay_api_keys || []).join(", "));
   setVal("k-coverr", (c.coverr_api_keys || []).join(", "));
+  setVal("k-lemonfox", c.lemonfox_api_key || "");
+  setVal("k-fal", c.fal_api_key || "");
   if (c.llm_provider && PROVIDERS[c.llm_provider]) providerSel.value = c.llm_provider;
   document.getElementById("k-subtitle").value = c.subtitle_provider ?? "edge";
   renderProviderFields(providerSel.value, c);
@@ -136,6 +155,8 @@ on("k-save", "click", busy("k-save", async () => {
     pixabay_api_keys: val("k-pixabay"),
     coverr_api_keys: val("k-coverr"),
     llm_provider: providerSel.value,
+    lemonfox_api_key: val("k-lemonfox"),
+    fal_api_key: val("k-fal"),
     subtitle_provider: document.getElementById("k-subtitle").value,
   };
   for (const [key] of PROVIDERS[providerSel.value]) {
@@ -147,6 +168,28 @@ on("k-save", "click", busy("k-save", async () => {
 
 // ---- generate -------------------------------------------------------------
 on("g-generate", "click", () => generate());
+on("g-script-btn", "click", busy("g-script-btn", async () => {
+  const err = byId("g-error");
+  err.className = "result";
+  err.textContent = "";
+  if (!backendHealthy) return setResult(err, false, "Backend is offline.");
+  const subject = val("g-subject");
+  if (!subject) return setResult(err, false, "Enter a subject first.");
+  logs.classList.remove("hidden");
+  addActivity("Writing the script…");
+  const resp = await window.api.scriptGenerate({
+    video_subject: subject,
+    video_language: byId("g-language").value,
+    paragraph_number: Number(val("g-paragraphs") || 1),
+  });
+  const script = resp.ok && resp.data && resp.data.data && resp.data.data.video_script;
+  if (script && !/Error:/.test(script)) {
+    byId("g-script").value = script;
+    addActivity("Script ready — edit it if you like, then Generate");
+  } else {
+    setResult(err, false, "Could not write script: " + (resp.data?.message || script || "error"));
+  }
+}));
 
 async function generate() {
   const err = document.getElementById("g-error");
@@ -156,9 +199,11 @@ async function generate() {
   const subject = val("g-subject");
   if (!subject) return setResult(err, false, "Enter a subject.");
 
+  lastSubject = subject;
   const params = {
     video_subject: subject,
     video_script: val("g-script"),
+    match_materials_to_script: byId("g-match").checked,
     video_language: byId("g-language").value,
     video_aspect: byId("g-aspect").value,
     video_source: byId("g-source").value,
@@ -171,11 +216,20 @@ async function generate() {
     subtitle_enabled: byId("g-subs").checked,
     font_size: Number(val("g-fontsize") || 60),
     subtitle_position: byId("g-position").value,
+    font_name: byId("g-font").value,
+    // Off = clean text + outline (no black box); on = dark background box.
+    text_background_color: byId("g-subbg").checked,
+    stroke_width: Number(val("g-stroke") || 1.5),
   };
 
   byId("g-results").innerHTML = "";
   setGenBusy(true);
+  lastStage = "";
+  logs.classList.remove("hidden");
+  addActivity(`Starting: “${subject}”`);
   setStatus("Submitting…");
+  // Persist the chosen encoder (read from config.app at render time).
+  await window.api.configSave({ video_codec: byId("g-codec").value });
   const resp = await window.api.videoGenerate(params);
   if (!resp.ok) {
     setGenBusy(false);
@@ -200,13 +254,21 @@ function pollTask(taskId) {
     const t = (r.data && r.data.data) || {};
     const prog = t.progress || 0;
     setProgress(prog);
+    renderDownloads(t.materials);
+    const stage = stageFor(prog);
+    if (t.state !== 1 && t.state !== -1 && stage !== lastStage) {
+      lastStage = stage;
+      addActivity(stage);
+    }
     if (t.state === 1) {
       setStatus("Done");
+      addActivity("Video ready");
       setGenBusy(false);
       return renderResults(t);
     }
     if (t.state === -1) {
       setStatus("");
+      addActivity("Generation failed — check your API keys and try again");
       setGenBusy(false);
       return setResult(byId("g-error"), false, "Generation failed — check the logs.");
     }
@@ -217,6 +279,7 @@ function pollTask(taskId) {
 }
 
 function renderResults(task) {
+  byId("g-downloads").innerHTML = "";
   const wrap = byId("g-results");
   const base = cfg.backendApi || "http://127.0.0.1:8080";
   const vids = task.videos || [];
@@ -242,6 +305,18 @@ function renderResults(task) {
   wrap.querySelectorAll("[data-path]").forEach((b) =>
     b.addEventListener("click", () => prefillSchedule(b.dataset.path, b.dataset.now === "1"))
   );
+
+  // Save each finished video into the user's Videos/MoneyPrinterTurbo folder.
+  vids.forEach(async (u, i) => {
+    const res = await window.api.videoExport(toTaskRel(u), lastSubject);
+    const card = wrap.querySelectorAll(".video-card")[i];
+    if (!card) return;
+    const note = document.createElement("div");
+    note.className = "saved-note";
+    note.textContent = res.ok ? `Saved to ${res.dest}` : `Save failed: ${res.error}`;
+    card.appendChild(note);
+    addActivity(res.ok ? "Saved to your Videos folder" : "Could not save to Videos folder");
+  });
 }
 
 function prefillSchedule(path, postNow) {
@@ -254,6 +329,28 @@ function prefillSchedule(path, postNow) {
   loadBrands();
 }
 
+function renderDownloads(list) {
+  const el = byId("g-downloads");
+  if (!list || !list.length) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML =
+    '<div class="dl-title">Downloading footage</div>' +
+    list
+      .map((m) => {
+        const pct = m.percent || 0;
+        const right =
+          m.status === "done" ? "✓" : m.status === "failed" ? "✕" : pct + "%";
+        return `<div class="dl-row">
+          <span class="dl-name">${escapeHtml(m.name)} · ${escapeHtml(m.source || "")} · ≤${m.clip_seconds}s</span>
+          <div class="dl-bar"><div class="dl-fill" style="width:${pct}%"></div></div>
+          <span class="dl-pct">${right}</span>
+        </div>`;
+      })
+      .join("");
+}
+
 function setGenBusy(b) {
   byId("g-generate").disabled = b;
   byId("g-progress").classList.toggle("hidden", !b);
@@ -263,6 +360,16 @@ function setStatus(s) { byId("g-status").textContent = s; }
 
 // ---- schedule -------------------------------------------------------------
 let brandsCache = [];
+
+function updateNetBoxes() {
+  const checked = [...document.querySelectorAll("#s-networks input:checked")].map((c) => c.value);
+  byId("s-youtube").classList.toggle("hidden", !checked.includes("youtube"));
+  byId("s-tiktok").classList.toggle("hidden", !checked.includes("tiktok"));
+}
+document.querySelectorAll("#s-networks input").forEach((cb) =>
+  cb.addEventListener("change", updateNetBoxes)
+);
+updateNetBoxes();
 
 async function loadBrands() {
   const sel = document.getElementById("s-brand");
@@ -299,10 +406,26 @@ on("s-submit", "click", busy("s-submit", async () => {
   if (!when) return setResult(result, false, "Pick a publish date and time.");
   if (!networks.length) return setResult(result, false, "Select at least one network.");
 
+  const network_data = {};
+  if (networks.includes("youtube")) {
+    const title = val("s-yt-title");
+    if (!title) return setResult(result, false, "YouTube requires a title.");
+    network_data.youtube = {
+      title,
+      type: "short",
+      privacy: byId("s-yt-privacy").value,
+      madeForKids: byId("s-yt-kids").checked,
+    };
+  }
+  if (networks.includes("tiktok")) {
+    network_data.tiktok = { privacyOption: byId("s-tt-privacy").value };
+  }
+
   const resp = await window.api.metricoolSchedule({
     video_path: val("s-video"),
     text: val("s-text"),
     networks,
+    network_data,
     publish_at: when.length === 16 ? when + ":00" : when,
     timezone: val("s-tz"),
     blog_id: numOrStr(val("s-brand")),

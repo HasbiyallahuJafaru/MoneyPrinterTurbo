@@ -8,7 +8,7 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
-from app.services import llm, material, subtitle, twelvelabs, video, voice, upload_post
+from app.services import llm, material, subtitle, twelvelabs, video, voice, upload_post, fal_video
 from app.services import state as sm
 from app.utils import file_security, utils
 
@@ -246,6 +246,22 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             )
             return None
         return [material_info.url for material_info in materials]
+    elif params.video_source == "klingai":
+        logger.info("\n\n## generating AI videos with KlingAI (fal.ai)")
+        generated = fal_video.generate_videos(
+            task_id=task_id,
+            prompts=video_terms,
+            video_aspect=params.video_aspect,
+            audio_duration=audio_duration * params.video_count,
+            max_clip_duration=params.video_clip_duration,
+        )
+        if not generated:
+            sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+            logger.error(
+                "failed to generate KlingAI videos; check the fal.ai API key and credits."
+            )
+            return None
+        return generated
     else:
         logger.info(f"\n\n## downloading videos from {params.video_source}")
         # 顺序匹配模式只在用户显式开启时生效。这里强制素材下载按关键词顺序

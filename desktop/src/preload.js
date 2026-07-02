@@ -15,8 +15,10 @@ contextBridge.exposeInMainWorld("api", {
   configGet: () => ipcRenderer.invoke("config:get"),
   configSave: (keys) => ipcRenderer.invoke("config:save", keys),
 
+  scriptGenerate: (body) => ipcRenderer.invoke("script:generate", body),
   videoGenerate: (params) => ipcRenderer.invoke("video:generate", params),
   videoStatus: (taskId) => ipcRenderer.invoke("video:status", taskId),
+  videoExport: (rel, name) => ipcRenderer.invoke("video:export", rel, name),
   backendBase: () => ipcRenderer.invoke("app:config"),
 
   onBackendState: (cb) =>

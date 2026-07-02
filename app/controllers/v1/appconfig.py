@@ -40,6 +40,12 @@ ALLOWED_KEYS = (
     "aihubmix_api_key", "aihubmix_base_url", "aihubmix_model_name",
     "volcengine_api_key", "volcengine_base_url", "volcengine_model_name",
     "ollama_base_url", "ollama_model_name",
+    # tts
+    "lemonfox_api_key", "lemonfox_base_url",
+    # ai footage (fal.ai kling)
+    "fal_api_key", "fal_kling_model",
+    # rendering
+    "video_codec",
     # subtitles
     "subtitle_provider",
 )
